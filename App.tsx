@@ -8,6 +8,7 @@ import { getProductRecommendation } from './services/geminiService';
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'search' | 'catalog'>('search');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<Category | 'All'>('All');
   const [filteredProducts, setFilteredProducts] = useState<Product[]>(PRODUCTS);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -21,19 +22,33 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (activeTab === 'catalog') {
-      const query = searchQuery.toLowerCase();
+      const query = searchQuery.toLowerCase().trim();
+      
       const filtered = PRODUCTS.filter(p => {
+        const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
+        if (!query) return matchesCategory;
+
         const matchesName = p.name.toLowerCase().includes(query);
         const matchesHindiName = p.hindiName?.toLowerCase().includes(query);
         const matchesBenefits = p.benefits.toLowerCase().includes(query);
-        const matchesCategory = p.category.toLowerCase().includes(query);
+        const matchesHindiBenefits = p.hindiBenefits?.toLowerCase().includes(query);
+        const matchesDescription = p.description.toLowerCase().includes(query);
+        const matchesIngredients = p.ingredients.some(i => i.toLowerCase().includes(query));
         const matchesKeywords = p.searchKeywords?.some(k => k.toLowerCase().includes(query));
         
-        return matchesName || matchesHindiName || matchesBenefits || matchesCategory || matchesKeywords;
+        return matchesCategory && (
+          matchesName || 
+          matchesHindiName || 
+          matchesBenefits || 
+          matchesHindiBenefits ||
+          matchesDescription || 
+          matchesIngredients || 
+          matchesKeywords
+        );
       });
       setFilteredProducts(filtered);
     }
-  }, [searchQuery, activeTab]);
+  }, [searchQuery, selectedCategory, activeTab]);
 
   useEffect(() => {
     scrollToBottom();
@@ -55,61 +70,76 @@ const App: React.FC = () => {
     setIsLoading(false);
   };
 
+  const getCategoryCount = (cat: Category | 'All') => {
+    if (cat === 'All') return PRODUCTS.length;
+    return PRODUCTS.filter(p => p.category === cat).length;
+  };
+
   return (
-    <div className="min-h-screen flex flex-col max-w-4xl mx-auto bg-slate-50">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-20 px-4 py-4">
-        <div className="flex items-center justify-between mb-4">
+    <div className="min-h-screen flex flex-col max-w-4xl mx-auto bg-slate-50 font-sans selection:bg-indigo-100">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-20 px-4 py-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-white shadow-md">
-              <i className="fas fa-hand-holding-medical text-xl"></i>
+            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-md border border-slate-100 transform -rotate-3 hover:rotate-0 transition-transform p-1 overflow-hidden">
+              <img 
+                src="https://ytmorganic.com/images/logo.png" 
+                alt="YTM Logo" 
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = 'https://placehold.co/100x100?text=YTM';
+                }}
+              />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-slate-900 leading-tight">YTM Medicine advisor</h1>
-              <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Expert Distributor Help</p>
+              <h1 className="text-xl font-black text-slate-900 leading-none">YTM ADVISOR</h1>
+              <p className="text-[10px] text-indigo-600 uppercase tracking-[0.2em] font-black mt-1">Medicine Expert • द्विभाषी</p>
             </div>
           </div>
-          <div className="flex bg-slate-100 p-1 rounded-lg">
+          <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
             <button 
               onClick={() => setActiveTab('search')}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'search' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-600'}`}
+              className={`px-5 py-2 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2 ${activeTab === 'search' ? 'bg-white shadow-md text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              <i className="fas fa-magic mr-2"></i>AI Advisor
+              <i className="fas fa-robot"></i> AI Help
             </button>
             <button 
               onClick={() => setActiveTab('catalog')}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'catalog' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-600'}`}
+              className={`px-5 py-2 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2 ${activeTab === 'catalog' ? 'bg-white shadow-md text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              <i className="fas fa-list-ul mr-2"></i>Full Catalog
+              <i className="fas fa-th-large"></i> Catalog
             </button>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto pb-24">
+      <main className="flex-1 overflow-y-auto pb-28">
         {activeTab === 'search' ? (
-          <div className="p-4 space-y-4">
+          <div className="p-4 space-y-6 max-w-2xl mx-auto w-full">
             {chatHistory.length === 0 && (
-              <div className="text-center py-10 px-6">
-                <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <i className="fas fa-user-md text-2xl"></i>
+              <div className="text-center py-12 px-6">
+                <div className="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6 rotate-6 shadow-inner">
+                  <i className="fas fa-stethoscope text-3xl"></i>
                 </div>
-                <h2 className="text-lg font-bold text-slate-800 mb-2">Puchiye Bimari ke Baare Mein</h2>
-                <p className="text-sm text-slate-500 mb-6">Type disease or symptom to find exact company medicine.</p>
-                <div className="grid grid-cols-1 gap-2 max-w-sm mx-auto">
+                <h2 className="text-2xl font-black text-slate-900 mb-2">Puchiye Bimari ke Baare Mein</h2>
+                <p className="text-sm text-slate-500 mb-8 font-medium">Get Hindi & English medicine details instantly. / अंग्रेजी और हिंदी में जानकारी प्राप्त करें।</p>
+                <div className="grid grid-cols-1 gap-3">
                   {[
                     'Vajan kam (Weight Loss) ke liye combo?',
-                    'Liver detox aur bhook badhane ke liye?',
-                    'Gas, acidity aur jalan ka turant ilaj?',
-                    'Skin itching, eczema aur pimples ke liye?',
-                    'Bacho ki height aur haddi mazboot karne ke liye?',
-                    'Baal jhadne (Hair fall) ke liye best dawa?'
+                    'Bhook badhane (Liver detox) ke liye?',
+                    'Acidity aur Gas ka turant upaay?',
+                    'Skin itching (दाद-खुजली) ke liye?',
+                    'Bacho ki height aur haddi (Bones) ke liye?',
+                    'Baal jhadne (Hair fall) ka ilaj?'
                   ].map((q, i) => (
                     <button 
                       key={i}
                       onClick={() => setInputValue(q)}
-                      className="text-left text-sm p-3 bg-white border border-slate-200 rounded-xl hover:border-indigo-400 hover:bg-indigo-50 transition-all shadow-sm flex items-center gap-3"
+                      className="text-left text-sm p-4 bg-white border-2 border-slate-100 rounded-2xl hover:border-indigo-500 hover:bg-indigo-50 transition-all shadow-sm flex items-center gap-4 group"
                     >
-                      <i className="fas fa-search-plus text-indigo-400"></i> {q}
+                      <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
+                        <i className="fas fa-comment-medical text-indigo-400"></i>
+                      </div>
+                      <span className="font-bold text-slate-700">{q}</span>
                     </button>
                   ))}
                 </div>
@@ -117,16 +147,21 @@ const App: React.FC = () => {
             )}
 
             {chatHistory.map((msg, idx) => (
-              <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[92%] rounded-2xl px-4 py-3 ${
+              <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2`}>
+                <div className={`max-w-[90%] sm:max-w-[80%] rounded-2xl px-5 py-4 ${
                   msg.role === 'user' 
-                  ? 'bg-indigo-600 text-white rounded-br-none shadow-md' 
+                  ? 'bg-indigo-600 text-white rounded-br-none shadow-xl shadow-indigo-100' 
                   : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none shadow-sm'
                 }`}>
-                  <div className="prose prose-sm max-w-none prose-slate text-inherit">
-                    {msg.content.split('\n').map((line, i) => (
-                      <p key={i} className={`mb-1 last:mb-0 whitespace-pre-wrap ${line.startsWith('**') || line.startsWith('#') ? 'font-bold mt-2' : ''}`}>{line}</p>
-                    ))}
+                  <div className="prose prose-sm max-w-none prose-slate text-inherit leading-relaxed">
+                    {msg.content.split('\n').map((line, i) => {
+                      const isHeading = line.startsWith('**') || line.startsWith('#');
+                      return (
+                        <p key={i} className={`mb-2 last:mb-0 whitespace-pre-wrap ${isHeading ? 'font-black text-indigo-800' : ''}`}>
+                          {line}
+                        </p>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -134,38 +169,78 @@ const App: React.FC = () => {
             
             {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm flex gap-1">
-                  <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                  <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-none px-6 py-4 shadow-sm flex gap-1.5 items-center">
+                  <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-bounce"></div>
+                  <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.2s]"></div>
+                  <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.4s]"></div>
                 </div>
               </div>
             )}
             <div ref={chatEndRef} />
           </div>
         ) : (
-          <div className="p-4">
-            <div className="mb-6 relative">
-              <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <div className="p-4 sm:p-6">
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 mb-8 shadow-sm">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div>
+                  <h2 className="text-2xl font-black text-slate-900">Product Inventory</h2>
+                  <p className="text-sm text-slate-500 font-medium">Bilingual Search: English & हिन्दी में खोजें</p>
+                </div>
+                <div className="flex items-center gap-4 bg-indigo-50 px-5 py-3 rounded-2xl border border-indigo-100">
+                  <div className="text-center">
+                    <span className="block text-[10px] font-black text-indigo-400 uppercase tracking-widest">Total</span>
+                    <span className="text-xl font-black text-indigo-700">{PRODUCTS.length}</span>
+                  </div>
+                  <div className="w-px h-8 bg-indigo-200"></div>
+                  <div className="text-center">
+                    <span className="block text-[10px] font-black text-indigo-400 uppercase tracking-widest">Showing</span>
+                    <span className="text-xl font-black text-indigo-700">{filteredProducts.length}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {['All', Category.MEDICINE, Category.SUPPLEMENT, Category.SKINCARE].map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat as any)}
+                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border-2 ${
+                      selectedCategory === cat 
+                      ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-100' 
+                      : 'bg-white border-slate-100 text-slate-500 hover:border-indigo-200 hover:text-indigo-600'
+                    }`}
+                  >
+                    {cat} <span className={`ml-1 opacity-60`}>({getCategoryCount(cat as any)})</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mb-8 relative max-w-2xl mx-auto group">
+              <i className="fas fa-search absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors"></i>
               <input 
                 type="text" 
-                placeholder="Search disease (Hindi/English)... e.g. 'bukhar', 'gas', 'vajan'"
-                className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm transition-all"
+                placeholder="Search: Liver, पथरी, Skin, शुगर..."
+                className="w-full pl-14 pr-32 py-4 bg-white border-2 border-slate-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none shadow-sm transition-all text-lg font-medium"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
+                <span className="text-[10px] font-black bg-indigo-100 text-indigo-600 px-2 py-1 rounded-md border border-indigo-200">EN/हिं</span>
+              </div>
             </div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {filteredProducts.map(product => (
                 <ProductCard key={product.id} product={product} />
               ))}
             </div>
 
             {filteredProducts.length === 0 && (
-              <div className="text-center py-20 text-slate-400">
-                <i className="fas fa-box-open text-4xl mb-4 block"></i>
-                Result nahi mila. Sahi spelling check karein.
+              <div className="text-center py-24 text-slate-400 bg-white rounded-3xl border-2 border-dashed border-slate-200 mt-6">
+                <i className="fas fa-search-minus text-5xl mb-6 block opacity-20"></i>
+                <p className="text-xl font-bold text-slate-600">Koi product nahi mila. / कोई उत्पाद नहीं मिला।</p>
+                <p className="text-sm">Check your spelling or try Hindi/English keywords.</p>
               </div>
             )}
           </div>
@@ -173,12 +248,12 @@ const App: React.FC = () => {
       </main>
 
       {activeTab === 'search' && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-slate-50/90 backdrop-blur-md border-t border-slate-200 max-w-4xl mx-auto z-30">
-          <form onSubmit={handleSendMessage} className="flex gap-2">
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-xl border-t border-slate-100 max-w-4xl mx-auto z-30 flex justify-center">
+          <form onSubmit={handleSendMessage} className="flex gap-3 w-full max-w-2xl">
             <input 
               type="text" 
-              placeholder="Bimari (e.g. Bukhar, Weight loss, Gas)..."
-              className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm transition-all"
+              placeholder="Ask: Liver detox, शुगर कंट्रोल, Hair fall..."
+              className="flex-1 px-6 py-4 bg-slate-100 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-2xl outline-none shadow-inner transition-all text-base font-bold"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               disabled={isLoading}
@@ -186,18 +261,18 @@ const App: React.FC = () => {
             <button 
               type="submit"
               disabled={isLoading || !inputValue.trim()}
-              className="w-12 h-12 bg-indigo-600 text-white rounded-xl flex items-center justify-center hover:bg-indigo-700 disabled:bg-slate-300 transition-all shadow-lg"
+              className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center hover:bg-indigo-700 disabled:bg-slate-300 transition-all shadow-lg shadow-indigo-200 active:scale-95"
             >
-              <i className="fas fa-paper-plane"></i>
+              <i className="fas fa-paper-plane text-xl"></i>
             </button>
           </form>
         </div>
       )}
 
       {activeTab === 'catalog' && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-slate-800/90 text-white text-xs font-bold rounded-full shadow-lg flex items-center gap-2 backdrop-blur-sm">
-          <i className="fas fa-list-ol text-indigo-400"></i>
-          TOTAL PRODUCTS: {PRODUCTS.length}
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 px-6 py-2.5 bg-slate-900 text-white text-xs font-black rounded-full shadow-2xl flex items-center gap-3 border border-slate-700 backdrop-blur-md">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+          SEARCHING IN BOTH LANGUAGES / दोनों भाषाओं में खोज जारी है
         </div>
       )}
     </div>
