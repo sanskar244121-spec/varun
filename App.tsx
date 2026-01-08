@@ -5,6 +5,14 @@ import { Product, Category, ChatMessage } from './types';
 import ProductCard from './components/ProductCard';
 import { getProductRecommendation } from './services/geminiService';
 
+// Extend Window interface for SpeechRecognition
+declare global {
+  interface Window {
+    webkitSpeechRecognition: any;
+    SpeechRecognition: any;
+  }
+}
+
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'search' | 'catalog'>('search');
   const [searchQuery, setSearchQuery] = useState('');
@@ -13,8 +21,12 @@ const App: React.FC = () => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [inputValue, setInputValue] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const [speechStatus, setSpeechStatus] = useState<string | null>(null);
+  const [isSpeechSupported, setIsSpeechSupported] = useState(true);
   
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
 
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -53,6 +65,113 @@ const App: React.FC = () => {
   useEffect(() => {
     scrollToBottom();
   }, [chatHistory]);
+
+  // Speech Recognition Setup
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      setIsSpeechSupported(false);
+      return;
+    }
+
+    const initRecognition = () => {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true; // Show results as user speaks
+      recognition.lang = 'hi-IN';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setSpeechStatus('Listening... Speak now / सुन रहा हूँ... बोलें');
+      };
+
+      recognition.onresult = (event: any) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
+        }
+
+        if (finalTranscript) {
+          setInputValue(prev => (prev ? `${prev} ${finalTranscript}` : finalTranscript));
+        }
+        
+        // Visual feedback for interim text
+        if (interimTranscript) {
+          setSpeechStatus(`Hearing: ${interimTranscript}...`);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+        
+        if (event.error === 'no-speech') {
+          setSpeechStatus('No speech detected. / आवाज नहीं सुनाई दी।');
+        } else if (event.error === 'not-allowed') {
+          setSpeechStatus('Mic permission blocked. / माइक की अनुमति नहीं है।');
+        } else if (event.error === 'network') {
+          setSpeechStatus('Network error. Check internet. / नेटवर्क त्रुटि।');
+        } else {
+          setSpeechStatus(`Mic Error: ${event.error}`);
+        }
+        
+        setTimeout(() => setSpeechStatus(null), 3000);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        // Clear hearing status on end if no error occurred
+        setSpeechStatus(prev => prev?.startsWith('Hearing') ? null : prev);
+      };
+
+      recognitionRef.current = recognition;
+    };
+
+    initRecognition();
+  }, []);
+
+  const toggleListening = async () => {
+    if (!isSpeechSupported) {
+      setSpeechStatus('Browser not supported. / ब्राउज़र सपोर्ट नहीं करता।');
+      setTimeout(() => setSpeechStatus(null), 3000);
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    try {
+      setSpeechStatus('Requesting mic... / अनुमति मांग रहे हैं...');
+      
+      // Explicitly check for microphone permission first
+      // This helps trigger the browser prompt more reliably in iframes/previews
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      // Stop the test stream immediately after getting permission
+      stream.getTracks().forEach(track => track.stop());
+
+      // Start the actual recognition
+      recognitionRef.current?.start();
+    } catch (err: any) {
+      console.error('Mic Access Error:', err);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setSpeechStatus('Mic access denied by user. / अनुमति नहीं दी गई।');
+      } else {
+        setSpeechStatus('Could not access mic. / माइक नहीं मिला।');
+      }
+      setIsListening(false);
+      setTimeout(() => setSpeechStatus(null), 3000);
+    }
+  };
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -112,7 +231,7 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto pb-28">
+      <main className="flex-1 overflow-y-auto pb-32">
         {activeTab === 'search' ? (
           <div className="p-4 space-y-6 max-w-2xl mx-auto w-full">
             {chatHistory.length === 0 && (
@@ -157,7 +276,7 @@ const App: React.FC = () => {
                     {msg.content.split('\n').map((line, i) => {
                       const isHeading = line.startsWith('**') || line.startsWith('#');
                       return (
-                        <p key={i} className={`mb-2 last:mb-0 whitespace-pre-wrap ${isHeading ? 'font-black text-indigo-800' : ''}`}>
+                        <p key={i} className={`mb-2 last:mb-0 whitespace-pre-wrap ${isHeading ? 'font-black text-indigo-800 underline decoration-indigo-200 decoration-2 underline-offset-4' : ''}`}>
                           {line}
                         </p>
                       );
@@ -248,20 +367,44 @@ const App: React.FC = () => {
       </main>
 
       {activeTab === 'search' && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-xl border-t border-slate-100 max-w-4xl mx-auto z-30 flex justify-center">
-          <form onSubmit={handleSendMessage} className="flex gap-3 w-full max-w-2xl">
-            <input 
-              type="text" 
-              placeholder="Ask: Liver detox, शुगर कंट्रोल, Hair fall..."
-              className="flex-1 px-6 py-4 bg-slate-100 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-2xl outline-none shadow-inner transition-all text-base font-bold"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              disabled={isLoading}
-            />
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-xl border-t border-slate-100 max-w-4xl mx-auto z-30 flex flex-col items-center">
+          {/* Voice status toast */}
+          {speechStatus && (
+            <div className="mb-2 px-4 py-1.5 bg-indigo-600 text-white text-[10px] sm:text-xs font-black rounded-full shadow-lg animate-in fade-in slide-in-from-bottom-2">
+              <i className="fas fa-volume-up mr-2"></i>
+              {speechStatus}
+            </div>
+          )}
+          
+          <form onSubmit={handleSendMessage} className="flex gap-3 w-full max-w-2xl items-center">
+            <div className="relative flex-1">
+              <input 
+                type="text" 
+                placeholder="Ask: Liver detox, शुगर कंट्रोल, Hair fall..."
+                className="w-full px-6 py-4 bg-slate-100 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-2xl outline-none shadow-inner transition-all text-base font-bold pr-14"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                disabled={isLoading}
+              />
+              <button 
+                type="button"
+                onClick={toggleListening}
+                className={`absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+                  isListening 
+                  ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-200' 
+                  : isSpeechSupported 
+                    ? 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                }`}
+                title={isSpeechSupported ? "Voice Input / आवाज़ से पूछें" : "Voice not supported"}
+              >
+                <i className={`fas ${isListening ? 'fa-microphone' : 'fa-microphone-alt'} text-lg`}></i>
+              </button>
+            </div>
             <button 
               type="submit"
               disabled={isLoading || !inputValue.trim()}
-              className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center hover:bg-indigo-700 disabled:bg-slate-300 transition-all shadow-lg shadow-indigo-200 active:scale-95"
+              className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center hover:bg-indigo-700 disabled:bg-slate-300 transition-all shadow-lg shadow-indigo-200 active:scale-95 flex-shrink-0"
             >
               <i className="fas fa-paper-plane text-xl"></i>
             </button>
