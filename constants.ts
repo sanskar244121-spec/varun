@@ -46,13 +46,13 @@ export const PRODUCTS: Product[] = [
     name: 'Sea Buckthorn',
     hindiName: 'सी बकथॉर्न',
     category: Category.SUPPLEMENT,
-    benefits: 'Glowing skin, anti-aging, immunity booster, liver detox, and heart health.',
-    hindiBenefits: 'चमकदार त्वचा, एंटी-एजिंग, इम्युनिटी बूस्टर और लिवर डिटॉक्स।',
+    benefits: 'Glowing skin, eye health, dry eyes, anti-aging, immunity booster, liver detox, and heart health.',
+    hindiBenefits: 'चमकदार त्वचा, आँखों का स्वास्थ्य, सूखी आँखें, एंटी-एजिंग, इम्युनिटी बूस्टर और लिवर डिटॉक्स।',
     dosage: 'Adults: 20–30 ml twice a day. Children: 5–10 ml twice a day.',
     hindiDosage: 'वयस्क: 20-30 मिली दिन में दो बार। बच्चे: 5-10 मिली।',
-    description: 'Nutrient-rich drink with vitamins A, C, E and Omega 3, 6, 7, 9.',
+    description: 'Nutrient-rich drink with vitamins A, C, E and Omega 3, 6, 7, 9. Excellent for dry eyes and retina health.',
     ingredients: ['Sea Buckthorn Berry', 'Omega Fatty Acids'],
-    searchKeywords: ['skin', 'immunity', 'anti-aging', 'detox', 'omega', 'vitamin c', 'chehra', 'glow']
+    searchKeywords: ['skin', 'eye', 'aankh', 'vision', 'dry eyes', 'immunity', 'anti-aging', 'detox', 'omega', 'vitamin c', 'chehra', 'glow']
   },
   {
     id: 'ytm_05',
