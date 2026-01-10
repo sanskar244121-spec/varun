@@ -13,6 +13,7 @@ declare global {
   }
 }
 
+// Skeleton loader for AI response
 const SkeletonMessage = () => (
   <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2">
     <div className="max-w-[85%] w-full bg-white border border-slate-200 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm space-y-3">
@@ -34,65 +35,75 @@ const SkeletonMessage = () => (
 );
 
 const App: React.FC = () => {
+  // ===== Auth =====
   const [user, setUser] = useState<any>(null);
   const loginWithGoogle = async () => {
-  try {
-    const result = await signInWithPopup(auth, googleProvider);
-    setUser(result.user);
-  } catch (e) {
-    alert("Google login failed");
-  }
-};
-const [activeTab, setActiveTab] = useState<'search' | 'catalog'>('search');
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      setUser(result.user);
+    } catch (e) {
+      alert("Google login failed");
+    }
+  };
+
+  // ===== State =====
+  const [activeTab, setActiveTab] = useState<'search' | 'catalog'>('search');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<Category | 'All'>('All');
   const [filteredProducts, setFilteredProducts] = useState<Product[]>(PRODUCTS);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  if (!user) {
-  return (
-    <div style={{ textAlign: "center", marginTop: "100px" }}>
-      <h2>Login to continue</h2>
-      <button
-        onClick={loginWithGoogle}
-        style={{ padding: "10px 20px", fontSize: "16px" }}
-      >
-        Sign in with Google
-      </button>
-    </div>
-  );
-}
-const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [speechStatus, setSpeechStatus] = useState<string | null>(null);
   const [isSpeechSupported, setIsSpeechSupported] = useState(true);
-  
+
+  // ===== Refs =====
   const chatEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
 
+  // ===== Auth check =====
+  if (!user) {
+    return (
+      <div style={{ textAlign: "center", marginTop: "100px" }}>
+        <h2>Login to continue</h2>
+        <button
+          onClick={loginWithGoogle}
+          style={{ padding: "10px 20px", fontSize: "16px" }}
+        >
+          Sign in with Google
+        </button>
+      </div>
+    );
+  }
+
+  // ===== Scroll =====
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // ===== Filter products =====
   useEffect(() => {
     const query = searchQuery.toLowerCase().trim();
     const filtered = PRODUCTS.filter(p => {
       const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
       if (!query) return matchesCategory;
       return matchesCategory && (
-        p.name.toLowerCase().includes(query) || 
-        p.hindiName?.toLowerCase().includes(query) || 
-        p.benefits.toLowerCase().includes(query) || 
+        p.name.toLowerCase().includes(query) ||
+        p.hindiName?.toLowerCase().includes(query) ||
+        p.benefits.toLowerCase().includes(query) ||
         p.searchKeywords?.some(k => k.toLowerCase().includes(query))
       );
     });
     setFilteredProducts(filtered);
   }, [searchQuery, selectedCategory, activeTab]);
 
+  // ===== Auto-scroll =====
   useEffect(() => {
     scrollToBottom();
   }, [chatHistory, isLoading]);
 
+  // ===== Speech Recognition =====
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -130,6 +141,7 @@ const [inputValue, setInputValue] = useState('');
     }
   };
 
+  // ===== Chat =====
   const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!inputValue.trim()) return;
@@ -145,8 +157,10 @@ const [inputValue, setInputValue] = useState('');
   const totalProducts = PRODUCTS.length;
   const categories: (Category | 'All')[] = ['All', Category.MEDICINE, Category.SUPPLEMENT, Category.SKINCARE];
 
+  // ===== JSX =====
   return (
     <div className="min-h-screen flex flex-col max-w-4xl mx-auto bg-slate-50 font-sans selection:bg-indigo-100">
+      {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-20 px-4 py-3 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -161,7 +175,7 @@ const [inputValue, setInputValue] = useState('');
               </div>
             </div>
           </div>
-          
+
           <div className="flex items-center justify-between sm:justify-end gap-3 bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
             <div className="flex gap-1">
               <button 
@@ -182,6 +196,7 @@ const [inputValue, setInputValue] = useState('');
         </div>
       </header>
 
+      {/* Main */}
       <main className="flex-1 overflow-y-auto pb-32">
         {activeTab === 'search' ? (
           <div className="p-4 space-y-6 max-w-2xl mx-auto w-full">
@@ -194,19 +209,6 @@ const [inputValue, setInputValue] = useState('');
                 <p className="text-xs text-slate-500 mb-8 font-medium italic">
                   I can guide you through our <strong>{totalProducts} products</strong>. How can I help? / मैं आपकी कैसे मदद कर सकता हूँ?
                 </p>
-                <div className="grid grid-cols-1 gap-2">
-                  {[
-                    'Weight Loss combo?', 
-                    'Liver detox ke liye kya hai?', 
-                    'Skin itching treatment?', 
-                    'Height growth for kids?'
-                  ].map((q, i) => (
-                    <button key={i} onClick={() => setInputValue(q)} className="text-left text-xs p-3.5 bg-white border border-slate-100 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all shadow-sm flex items-center gap-3">
-                      <i className="fas fa-plus-circle text-indigo-300"></i>
-                      <span className="font-bold text-slate-700">{q}</span>
-                    </button>
-                  ))}
-                </div>
               </div>
             )}
 
@@ -219,14 +221,14 @@ const [inputValue, setInputValue] = useState('');
                 </div>
               </div>
             ))}
-            
+
             {isLoading && <SkeletonMessage />}
-            
             <div ref={chatEndRef} />
           </div>
         ) : (
           <div className="p-4 max-w-4xl mx-auto">
-             <div className="mb-6 space-y-4 max-w-2xl mx-auto">
+            {/* Search + Category */}
+            <div className="mb-6 space-y-4 max-w-2xl mx-auto">
               <div className="relative">
                 <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
                 <input 
@@ -238,7 +240,6 @@ const [inputValue, setInputValue] = useState('');
                 />
               </div>
 
-              {/* Category Filter Chips */}
               <div className="flex flex-wrap gap-2 justify-center">
                 {categories.map((cat) => (
                   <button
@@ -290,6 +291,7 @@ const [inputValue, setInputValue] = useState('');
         )}
       </main>
 
+      {/* Input Box */}
       {activeTab === 'search' && (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-slate-100 max-w-4xl mx-auto z-30">
           <form onSubmit={handleSendMessage} className="flex gap-2 w-full max-w-2xl mx-auto items-center">
