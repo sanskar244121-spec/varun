@@ -1,4 +1,5 @@
-
+import { signInWithPopup } from "firebase/auth";
+import { auth, googleProvider } from "./firebase";
 import React, { useState, useEffect, useRef } from 'react';
 import { PRODUCTS } from './constants';
 import { Product, Category, ChatMessage } from './types';
@@ -33,13 +34,35 @@ const SkeletonMessage = () => (
 );
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'search' | 'catalog'>('search');
+  const [user, setUser] = useState<any>(null);
+  const loginWithGoogle = async () => {
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    setUser(result.user);
+  } catch (e) {
+    alert("Google login failed");
+  }
+};
+const [activeTab, setActiveTab] = useState<'search' | 'catalog'>('search');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<Category | 'All'>('All');
   const [filteredProducts, setFilteredProducts] = useState<Product[]>(PRODUCTS);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [inputValue, setInputValue] = useState('');
+  if (!user) {
+  return (
+    <div style={{ textAlign: "center", marginTop: "100px" }}>
+      <h2>Login to continue</h2>
+      <button
+        onClick={loginWithGoogle}
+        style={{ padding: "10px 20px", fontSize: "16px" }}
+      >
+        Sign in with Google
+      </button>
+    </div>
+  );
+}
+const [inputValue, setInputValue] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [speechStatus, setSpeechStatus] = useState<string | null>(null);
   const [isSpeechSupported, setIsSpeechSupported] = useState(true);
