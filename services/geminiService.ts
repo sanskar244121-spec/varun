@@ -3,8 +3,8 @@ import { GoogleGenAI } from "@google/genai";
 import { PRODUCTS } from "../constants";
 import { ChatMessage } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-
+// Always use named parameter for apiKey and obtain it from process.env.API_KEY
+// DO NOT define or prompt for the API key in the UI.
 const SYSTEM_INSTRUCTION = `
 You are the "YTM Medicine Advisor". You help direct selling distributors find the right products from the YTM catalog.
 
@@ -50,9 +50,13 @@ FORMATTING:
 `;
 
 export async function getProductRecommendation(query: string, history: ChatMessage[] = []): Promise<string> {
+  // Always initialize GoogleGenAI inside or right before use with process.env.API_KEY
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      // Using gemini-3-pro-preview for complex medical catalog reasoning
+      model: "gemini-3-pro-preview",
       contents: [
         ...history.map(m => ({ role: m.role, parts: [{ text: m.content }] })),
         { role: 'user', parts: [{ text: query }] }
@@ -63,6 +67,7 @@ export async function getProductRecommendation(query: string, history: ChatMessa
       },
     });
 
+    // Access the generated text directly using the .text property (not a method)
     return response.text || "Pardon, main samajh nahi paaya. Kripya dubara puchein. / क्षमा करें, मैं समझ नहीं पाया। कृपया दोबारा पूछें।";
   } catch (error) {
     console.error("Gemini API Error:", error);

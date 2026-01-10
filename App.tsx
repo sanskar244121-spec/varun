@@ -5,13 +5,32 @@ import { Product, Category, ChatMessage } from './types';
 import ProductCard from './components/ProductCard';
 import { getProductRecommendation } from './services/geminiService';
 
-// Extend Window interface for SpeechRecognition
 declare global {
   interface Window {
     webkitSpeechRecognition: any;
     SpeechRecognition: any;
   }
 }
+
+const SkeletonMessage = () => (
+  <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2">
+    <div className="max-w-[85%] w-full bg-white border border-slate-200 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm space-y-3">
+      <div className="flex items-center gap-2 mb-2">
+        <div className="w-4 h-4 bg-indigo-100 rounded-full animate-pulse"></div>
+        <div className="h-2 w-20 bg-slate-100 rounded animate-pulse"></div>
+      </div>
+      <div className="space-y-2">
+        <div className="h-3 w-full bg-slate-100 rounded animate-pulse"></div>
+        <div className="h-3 w-[90%] bg-slate-100 rounded animate-pulse"></div>
+        <div className="h-3 w-[70%] bg-slate-100 rounded animate-pulse"></div>
+      </div>
+      <div className="pt-2 flex gap-2">
+        <div className="h-2 w-16 bg-slate-50 rounded animate-pulse"></div>
+        <div className="h-2 w-12 bg-slate-50 rounded animate-pulse"></div>
+      </div>
+    </div>
+  </div>
+);
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'search' | 'catalog'>('search');
@@ -33,200 +52,109 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    if (activeTab === 'catalog') {
-      const query = searchQuery.toLowerCase().trim();
-      
-      const filtered = PRODUCTS.filter(p => {
-        const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
-        if (!query) return matchesCategory;
-
-        const matchesName = p.name.toLowerCase().includes(query);
-        const matchesHindiName = p.hindiName?.toLowerCase().includes(query);
-        const matchesBenefits = p.benefits.toLowerCase().includes(query);
-        const matchesHindiBenefits = p.hindiBenefits?.toLowerCase().includes(query);
-        const matchesDescription = p.description.toLowerCase().includes(query);
-        const matchesIngredients = p.ingredients.some(i => i.toLowerCase().includes(query));
-        const matchesKeywords = p.searchKeywords?.some(k => k.toLowerCase().includes(query));
-        
-        return matchesCategory && (
-          matchesName || 
-          matchesHindiName || 
-          matchesBenefits || 
-          matchesHindiBenefits ||
-          matchesDescription || 
-          matchesIngredients || 
-          matchesKeywords
-        );
-      });
-      setFilteredProducts(filtered);
-    }
+    const query = searchQuery.toLowerCase().trim();
+    const filtered = PRODUCTS.filter(p => {
+      const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
+      if (!query) return matchesCategory;
+      return matchesCategory && (
+        p.name.toLowerCase().includes(query) || 
+        p.hindiName?.toLowerCase().includes(query) || 
+        p.benefits.toLowerCase().includes(query) || 
+        p.searchKeywords?.some(k => k.toLowerCase().includes(query))
+      );
+    });
+    setFilteredProducts(filtered);
   }, [searchQuery, selectedCategory, activeTab]);
 
   useEffect(() => {
     scrollToBottom();
-  }, [chatHistory]);
+  }, [chatHistory, isLoading]);
 
-  // Speech Recognition Setup
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
     if (!SpeechRecognition) {
       setIsSpeechSupported(false);
       return;
     }
-
-    const initRecognition = () => {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = true; // Show results as user speaks
-      recognition.lang = 'hi-IN';
-
-      recognition.onstart = () => {
-        setIsListening(true);
-        setSpeechStatus('Listening... Speak now / सुन रहा हूँ... बोलें');
-      };
-
-      recognition.onresult = (event: any) => {
-        let interimTranscript = '';
-        let finalTranscript = '';
-
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
-          } else {
-            interimTranscript += event.results[i][0].transcript;
-          }
-        }
-
-        if (finalTranscript) {
-          setInputValue(prev => (prev ? `${prev} ${finalTranscript}` : finalTranscript));
-        }
-        
-        // Visual feedback for interim text
-        if (interimTranscript) {
-          setSpeechStatus(`Hearing: ${interimTranscript}...`);
-        }
-      };
-
-      recognition.onerror = (event: any) => {
-        console.error('Speech recognition error:', event.error);
-        setIsListening(false);
-        
-        if (event.error === 'no-speech') {
-          setSpeechStatus('No speech detected. / आवाज नहीं सुनाई दी।');
-        } else if (event.error === 'not-allowed') {
-          setSpeechStatus('Mic permission blocked. / माइक की अनुमति नहीं है।');
-        } else if (event.error === 'network') {
-          setSpeechStatus('Network error. Check internet. / नेटवर्क त्रुटि।');
-        } else {
-          setSpeechStatus(`Mic Error: ${event.error}`);
-        }
-        
-        setTimeout(() => setSpeechStatus(null), 3000);
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-        // Clear hearing status on end if no error occurred
-        setSpeechStatus(prev => prev?.startsWith('Hearing') ? null : prev);
-      };
-
-      recognitionRef.current = recognition;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true; 
+    recognition.lang = 'hi-IN';
+    recognition.onstart = () => {
+      setIsListening(true);
+      setSpeechStatus('Sun raha hoon... / Listening...');
     };
-
-    initRecognition();
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results).map((res: any) => res[0].transcript).join('');
+      if (event.results[0].isFinal) setInputValue(prev => prev ? `${prev} ${transcript}` : transcript);
+      setSpeechStatus(`Hearing: ${transcript}`);
+    };
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => {
+      setIsListening(false);
+      setSpeechStatus(null);
+    };
+    recognitionRef.current = recognition;
   }, []);
 
   const toggleListening = async () => {
-    if (!isSpeechSupported) {
-      setSpeechStatus('Browser not supported. / ब्राउज़र सपोर्ट नहीं करता।');
-      setTimeout(() => setSpeechStatus(null), 3000);
-      return;
-    }
-
-    if (isListening) {
-      recognitionRef.current?.stop();
-      return;
-    }
-
+    if (isListening) return recognitionRef.current?.stop();
     try {
-      setSpeechStatus('Requesting mic... / अनुमति मांग रहे हैं...');
-      
-      // Explicitly check for microphone permission first
-      // This helps trigger the browser prompt more reliably in iframes/previews
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      // Stop the test stream immediately after getting permission
-      stream.getTracks().forEach(track => track.stop());
-
-      // Start the actual recognition
+      await navigator.mediaDevices.getUserMedia({ audio: true });
       recognitionRef.current?.start();
-    } catch (err: any) {
-      console.error('Mic Access Error:', err);
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setSpeechStatus('Mic access denied by user. / अनुमति नहीं दी गई।');
-      } else {
-        setSpeechStatus('Could not access mic. / माइक नहीं मिला।');
-      }
-      setIsListening(false);
-      setTimeout(() => setSpeechStatus(null), 3000);
+    } catch {
+      setSpeechStatus('Mic error.');
     }
   };
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!inputValue.trim()) return;
-
     const userMsg: ChatMessage = { role: 'user', content: inputValue };
     setChatHistory(prev => [...prev, userMsg]);
     setInputValue('');
     setIsLoading(true);
-
     const responseText = await getProductRecommendation(inputValue, chatHistory);
-    const aiMsg: ChatMessage = { role: 'model', content: responseText };
-    
-    setChatHistory(prev => [...prev, aiMsg]);
+    setChatHistory(prev => [...prev, { role: 'model', content: responseText }]);
     setIsLoading(false);
   };
 
-  const getCategoryCount = (cat: Category | 'All') => {
-    if (cat === 'All') return PRODUCTS.length;
-    return PRODUCTS.filter(p => p.category === cat).length;
-  };
+  const totalProducts = PRODUCTS.length;
+  const categories: (Category | 'All')[] = ['All', Category.MEDICINE, Category.SUPPLEMENT, Category.SKINCARE];
 
   return (
     <div className="min-h-screen flex flex-col max-w-4xl mx-auto bg-slate-50 font-sans selection:bg-indigo-100">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-20 px-4 py-4 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-20 px-4 py-3 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-md border border-slate-100 transform -rotate-3 hover:rotate-0 transition-transform p-1 overflow-hidden">
-              <img 
-                src="https://ytmorganic.com/images/logo.png" 
-                alt="YTM Logo" 
-                className="w-full h-full object-contain"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://placehold.co/100x100?text=YTM';
-                }}
-              />
+            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-md border border-slate-100 p-1 overflow-hidden">
+              <img src="./logo.png" alt="YTM Logo" className="w-full h-full object-contain" />
             </div>
             <div>
-              <h1 className="text-xl font-black text-slate-900 leading-none">YTM ADVISOR</h1>
-              <p className="text-[10px] text-indigo-600 uppercase tracking-[0.2em] font-black mt-1">Medicine Expert • द्विभाषी</p>
+              <h1 className="text-lg font-black text-slate-900 leading-none uppercase">YTM ADVISOR</h1>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                <p className="text-[9px] text-indigo-600 uppercase tracking-widest font-black">Medicine Advisor</p>
+              </div>
             </div>
           </div>
-          <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
-            <button 
-              onClick={() => setActiveTab('search')}
-              className={`px-5 py-2 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2 ${activeTab === 'search' ? 'bg-white shadow-md text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              <i className="fas fa-robot"></i> AI Help
-            </button>
-            <button 
-              onClick={() => setActiveTab('catalog')}
-              className={`px-5 py-2 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2 ${activeTab === 'catalog' ? 'bg-white shadow-md text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              <i className="fas fa-th-large"></i> Catalog
-            </button>
+          
+          <div className="flex items-center justify-between sm:justify-end gap-3 bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
+            <div className="flex gap-1">
+              <button 
+                onClick={() => setActiveTab('search')}
+                className={`px-4 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'search' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
+              >
+                <i className="fas fa-robot"></i> Advisor
+              </button>
+              <button 
+                onClick={() => setActiveTab('catalog')}
+                className={`px-4 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'catalog' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
+              >
+                <i className="fas fa-th-large"></i> Catalog
+                <span className="bg-slate-200 text-slate-600 text-[10px] px-1.5 py-0.5 rounded-md font-black">{totalProducts}</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -236,28 +164,22 @@ const App: React.FC = () => {
           <div className="p-4 space-y-6 max-w-2xl mx-auto w-full">
             {chatHistory.length === 0 && (
               <div className="text-center py-12 px-6">
-                <div className="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6 rotate-6 shadow-inner">
-                  <i className="fas fa-stethoscope text-3xl"></i>
+                <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 rotate-3 shadow-inner">
+                  <i className="fas fa-magic text-2xl"></i>
                 </div>
-                <h2 className="text-2xl font-black text-slate-900 mb-2">Puchiye Bimari ke Baare Mein</h2>
-                <p className="text-sm text-slate-500 mb-8 font-medium">Get Hindi & English medicine details instantly. / अंग्रेजी और हिंदी में जानकारी प्राप्त करें।</p>
-                <div className="grid grid-cols-1 gap-3">
+                <h2 className="text-xl font-black text-slate-900 mb-1">Namaste!</h2>
+                <p className="text-xs text-slate-500 mb-8 font-medium italic">
+                  I can guide you through our <strong>{totalProducts} products</strong>. How can I help? / मैं आपकी कैसे मदद कर सकता हूँ?
+                </p>
+                <div className="grid grid-cols-1 gap-2">
                   {[
-                    'Vajan kam (Weight Loss) ke liye combo?',
-                    'Bhook badhane (Liver detox) ke liye?',
-                    'Acidity aur Gas ka turant upaay?',
-                    'Skin itching (दाद-खुजली) ke liye?',
-                    'Bacho ki height aur haddi (Bones) ke liye?',
-                    'Baal jhadne (Hair fall) ka ilaj?'
+                    'Weight Loss combo?', 
+                    'Liver detox ke liye kya hai?', 
+                    'Skin itching treatment?', 
+                    'Height growth for kids?'
                   ].map((q, i) => (
-                    <button 
-                      key={i}
-                      onClick={() => setInputValue(q)}
-                      className="text-left text-sm p-4 bg-white border-2 border-slate-100 rounded-2xl hover:border-indigo-500 hover:bg-indigo-50 transition-all shadow-sm flex items-center gap-4 group"
-                    >
-                      <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
-                        <i className="fas fa-comment-medical text-indigo-400"></i>
-                      </div>
+                    <button key={i} onClick={() => setInputValue(q)} className="text-left text-xs p-3.5 bg-white border border-slate-100 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all shadow-sm flex items-center gap-3">
+                      <i className="fas fa-plus-circle text-indigo-300"></i>
                       <span className="font-bold text-slate-700">{q}</span>
                     </button>
                   ))}
@@ -267,99 +189,78 @@ const App: React.FC = () => {
 
             {chatHistory.map((msg, idx) => (
               <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2`}>
-                <div className={`max-w-[90%] sm:max-w-[80%] rounded-2xl px-5 py-4 ${
-                  msg.role === 'user' 
-                  ? 'bg-indigo-600 text-white rounded-br-none shadow-xl shadow-indigo-100' 
-                  : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none shadow-sm'
-                }`}>
-                  <div className="prose prose-sm max-w-none prose-slate text-inherit leading-relaxed">
-                    {msg.content.split('\n').map((line, i) => {
-                      const isHeading = line.startsWith('**') || line.startsWith('#');
-                      return (
-                        <p key={i} className={`mb-2 last:mb-0 whitespace-pre-wrap ${isHeading ? 'font-black text-indigo-800 underline decoration-indigo-200 decoration-2 underline-offset-4' : ''}`}>
-                          {line}
-                        </p>
-                      );
-                    })}
+                <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none shadow-md' : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none shadow-sm'}`}>
+                  <div className="prose prose-sm prose-slate text-inherit leading-relaxed whitespace-pre-wrap">
+                    {msg.content}
                   </div>
                 </div>
               </div>
             ))}
             
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-none px-6 py-4 shadow-sm flex gap-1.5 items-center">
-                  <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-bounce"></div>
-                  <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.2s]"></div>
-                  <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.4s]"></div>
-                </div>
-              </div>
-            )}
+            {isLoading && <SkeletonMessage />}
+            
             <div ref={chatEndRef} />
           </div>
         ) : (
-          <div className="p-4 sm:p-6">
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 mb-8 shadow-sm">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                <div>
-                  <h2 className="text-2xl font-black text-slate-900">Product Inventory</h2>
-                  <p className="text-sm text-slate-500 font-medium">Bilingual Search: English & हिन्दी में खोजें</p>
-                </div>
-                <div className="flex items-center gap-4 bg-indigo-50 px-5 py-3 rounded-2xl border border-indigo-100">
-                  <div className="text-center">
-                    <span className="block text-[10px] font-black text-indigo-400 uppercase tracking-widest">Total</span>
-                    <span className="text-xl font-black text-indigo-700">{PRODUCTS.length}</span>
-                  </div>
-                  <div className="w-px h-8 bg-indigo-200"></div>
-                  <div className="text-center">
-                    <span className="block text-[10px] font-black text-indigo-400 uppercase tracking-widest">Showing</span>
-                    <span className="text-xl font-black text-indigo-700">{filteredProducts.length}</span>
-                  </div>
-                </div>
+          <div className="p-4 max-w-4xl mx-auto">
+             <div className="mb-6 space-y-4 max-w-2xl mx-auto">
+              <div className="relative">
+                <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                <input 
+                  type="text" 
+                  placeholder={`Search ${totalProducts} products...`}
+                  className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-2xl focus:border-indigo-500 outline-none shadow-sm font-medium"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                {['All', Category.MEDICINE, Category.SUPPLEMENT, Category.SKINCARE].map((cat) => (
+              {/* Category Filter Chips */}
+              <div className="flex flex-wrap gap-2 justify-center">
+                {categories.map((cat) => (
                   <button
                     key={cat}
-                    onClick={() => setSelectedCategory(cat as any)}
-                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border-2 ${
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
                       selectedCategory === cat 
-                      ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-100' 
-                      : 'bg-white border-slate-100 text-slate-500 hover:border-indigo-200 hover:text-indigo-600'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' 
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-200'
                     }`}
                   >
-                    {cat} <span className={`ml-1 opacity-60`}>({getCategoryCount(cat as any)})</span>
+                    {cat}
                   </button>
                 ))}
               </div>
-            </div>
 
-            <div className="mb-8 relative max-w-2xl mx-auto group">
-              <i className="fas fa-search absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors"></i>
-              <input 
-                type="text" 
-                placeholder="Search: Liver, पथरी, Skin, शुगर..."
-                className="w-full pl-14 pr-32 py-4 bg-white border-2 border-slate-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none shadow-sm transition-all text-lg font-medium"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
-                <span className="text-[10px] font-black bg-indigo-100 text-indigo-600 px-2 py-1 rounded-md border border-indigo-200">EN/हिं</span>
+              <div className="flex justify-between items-center px-2">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  Found {filteredProducts.length} items
+                </span>
+                {selectedCategory !== 'All' && (
+                  <button 
+                    onClick={() => setSelectedCategory('All')}
+                    className="text-[10px] font-black text-indigo-500 uppercase tracking-widest"
+                  >
+                    Clear Filter
+                  </button>
+                )}
               </div>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {filteredProducts.map(product => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
 
-            {filteredProducts.length === 0 && (
-              <div className="text-center py-24 text-slate-400 bg-white rounded-3xl border-2 border-dashed border-slate-200 mt-6">
-                <i className="fas fa-search-minus text-5xl mb-6 block opacity-20"></i>
-                <p className="text-xl font-bold text-slate-600">Koi product nahi mila. / कोई उत्पाद नहीं मिला।</p>
-                <p className="text-sm">Check your spelling or try Hindi/English keywords.</p>
+            {filteredProducts.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {filteredProducts.map(product => <ProductCard key={product.id} product={product} />)}
+              </div>
+            ) : (
+              <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-200">
+                <i className="fas fa-search text-3xl text-slate-200 mb-4"></i>
+                <p className="text-slate-500 font-bold">No products match your criteria</p>
+                <button 
+                  onClick={() => {setSearchQuery(''); setSelectedCategory('All');}}
+                  className="mt-4 text-indigo-600 text-xs font-black uppercase tracking-wider"
+                >
+                  Reset All
+                </button>
               </div>
             )}
           </div>
@@ -367,21 +268,13 @@ const App: React.FC = () => {
       </main>
 
       {activeTab === 'search' && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-xl border-t border-slate-100 max-w-4xl mx-auto z-30 flex flex-col items-center">
-          {/* Voice status toast */}
-          {speechStatus && (
-            <div className="mb-2 px-4 py-1.5 bg-indigo-600 text-white text-[10px] sm:text-xs font-black rounded-full shadow-lg animate-in fade-in slide-in-from-bottom-2">
-              <i className="fas fa-volume-up mr-2"></i>
-              {speechStatus}
-            </div>
-          )}
-          
-          <form onSubmit={handleSendMessage} className="flex gap-3 w-full max-w-2xl items-center">
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-slate-100 max-w-4xl mx-auto z-30">
+          <form onSubmit={handleSendMessage} className="flex gap-2 w-full max-w-2xl mx-auto items-center">
             <div className="relative flex-1">
               <input 
                 type="text" 
-                placeholder="Ask: Liver detox, शुगर कंट्रोल, Hair fall..."
-                className="w-full px-6 py-4 bg-slate-100 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-2xl outline-none shadow-inner transition-all text-base font-bold pr-14"
+                placeholder="Bimari ka naam likhein (e.g. Sugar, Piles)..."
+                className="w-full px-5 py-3.5 bg-slate-100 border border-transparent focus:border-indigo-500 focus:bg-white rounded-2xl outline-none shadow-inner transition-all text-sm font-bold pr-12"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 disabled={isLoading}
@@ -389,33 +282,16 @@ const App: React.FC = () => {
               <button 
                 type="button"
                 onClick={toggleListening}
-                className={`absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
-                  isListening 
-                  ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-200' 
-                  : isSpeechSupported 
-                    ? 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
-                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                }`}
-                title={isSpeechSupported ? "Voice Input / आवाज़ से पूछें" : "Voice not supported"}
+                className={`absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-xl flex items-center justify-center transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-indigo-50 text-indigo-600'}`}
               >
-                <i className={`fas ${isListening ? 'fa-microphone' : 'fa-microphone-alt'} text-lg`}></i>
+                <i className={`fas ${isListening ? 'fa-microphone' : 'fa-microphone-alt'}`}></i>
               </button>
             </div>
-            <button 
-              type="submit"
-              disabled={isLoading || !inputValue.trim()}
-              className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center hover:bg-indigo-700 disabled:bg-slate-300 transition-all shadow-lg shadow-indigo-200 active:scale-95 flex-shrink-0"
-            >
-              <i className="fas fa-paper-plane text-xl"></i>
+            <button type="submit" disabled={isLoading || !inputValue.trim()} className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center hover:bg-indigo-700 disabled:bg-slate-300 shadow-lg active:scale-95 transition-all">
+              <i className="fas fa-paper-plane"></i>
             </button>
           </form>
-        </div>
-      )}
-
-      {activeTab === 'catalog' && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 px-6 py-2.5 bg-slate-900 text-white text-xs font-black rounded-full shadow-2xl flex items-center gap-3 border border-slate-700 backdrop-blur-md">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-          SEARCHING IN BOTH LANGUAGES / दोनों भाषाओं में खोज जारी है
+          {speechStatus && <p className="text-[9px] text-center mt-2 font-black text-indigo-500 uppercase tracking-widest">{speechStatus}</p>}
         </div>
       )}
     </div>

@@ -5,6 +5,13 @@ export enum Category {
   SUPPLEMENT = 'Supplement'
 }
 
+// User interface for authentication and profile display
+export interface User {
+  name: string;
+  email: string;
+  picture: string;
+}
+
 export interface Product {
   id: string;
   name: string;
