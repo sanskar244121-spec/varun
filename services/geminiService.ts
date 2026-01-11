@@ -1,3 +1,4 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { PRODUCTS } from "../constants";
 import { ChatMessage } from "../types";
 
@@ -7,11 +8,14 @@ if (!API_KEY) {
   throw new Error("VITE_GEMINI_API_KEY missing");
 }
 
-const SYSTEM_INSTRUCTION = `
-You are the "YTM Medicine Advisor". You help direct selling distributors find the right products from the YTM catalog.
+const genAI = new GoogleGenerativeAI(API_KEY);
 
-Catalog Size: ${PRODUCTS.length}
-Products: ${JSON.stringify(PRODUCTS)}
+const SYSTEM_INSTRUCTION = `
+You are the "YTM Medicine Advisor".
+You help distributors choose correct YTM products.
+
+Catalog size: ${PRODUCTS.length}
+Catalog data: ${JSON.stringify(PRODUCTS)}
 `;
 
 export async function getProductRecommendation(
@@ -19,34 +23,22 @@ export async function getProductRecommendation(
   history: ChatMessage[] = []
 ): Promise<string> {
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [
-                {
-                  text: SYSTEM_INSTRUCTION + "\n\nUser query: " + query,
-                },
-              ],
-            },
-          ],
-        }),
-      }
-    );
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-pro",
+      systemInstruction: SYSTEM_INSTRUCTION,
+    });
 
-    const data = await response.json();
+    const chat = model.startChat({
+      history: history.map(m => ({
+        role: m.role,
+        parts: [{ text: m.content }],
+      })),
+    });
 
-    return (
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "Maafi chahta hoon, response nahi mila."
-    );
+    const result = await chat.sendMessage(query);
+    return result.response.text();
   } catch (err) {
     console.error(err);
-    return "Network error. Kripya baad me try karein.";
+    return "Network issue. Please try again.";
   }
 }
