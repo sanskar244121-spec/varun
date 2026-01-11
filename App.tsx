@@ -1,5 +1,5 @@
 import { signInWithPopup } from "firebase/auth";
-import { auth, googleProvider } from "./firebase";
+import { auth, googleProvider } from "./services/firebase";
 import React, { useState, useEffect, useRef } from 'react';
 import { PRODUCTS } from './constants';
 import { Product, Category, ChatMessage } from './types';
