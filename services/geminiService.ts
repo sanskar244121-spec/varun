@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { PRODUCTS } from "../constants";
 import { ChatMessage } from "../types";
 
@@ -8,7 +8,7 @@ if (!API_KEY) {
   throw new Error("VITE_GEMINI_API_KEY missing");
 }
 
-const genAI = new GoogleGenerativeAI(API_KEY);
+const genAI = new GoogleGenAI({ apiKey: API_KEY });
 
 const SYSTEM_INSTRUCTION = `
 You are the "YTM Medicine Advisor".
@@ -23,11 +23,9 @@ export async function getProductRecommendation(
   history: ChatMessage[] = []
 ): Promise<string> {
   try {
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-pro",
-      systemInstruction: SYSTEM_INSTRUCTION,
-    });
-
+    const model = genAI.models.get({
+  model: "gemini-1.5-flash"
+});
     const chat = model.startChat({
       history: history.map(m => ({
         role: m.role,
@@ -35,10 +33,13 @@ export async function getProductRecommendation(
       })),
     });
 
-    const result = await chat.sendMessage(query);
-    return result.response.text();
-  } catch (err) {
-    console.error(err);
-    return "Network issue. Please try again.";
-  }
-}
+   const result = await model.generateContent({
+  contents: [
+    {
+      role: "user",
+      parts: [{ text: prompt }]
+    }
+  ]
+});
+
+const text = result.text;
