@@ -2,12 +2,10 @@ import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCHvP82ArsdblUc1MU8WazZoU2ZtLZhuKc",
-  authDomain: "ytm-medicine-advisor-2ce0a.firebaseapp.com",
-  projectId: "ytm-medicine-advisor-2ce0a",
-  storageBucket: "ytm-medicine-advisor-2ce0a.firebasestorage.app",
-  messagingSenderId: "919063962330",
-  appId: "1:919063962330:web:b6b58194cf93989eb43be3",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 const app = initializeApp(firebaseConfig);
