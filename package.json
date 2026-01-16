@@ -1,3 +1,4 @@
+
 {
   "name": "ytm-medicine-advisor",
   "private": true,
@@ -9,14 +10,18 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "firebase": "^10.12.2",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "@google/genai": "^1.34.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@types/react": "^18.2.37",
-    "@types/react-dom": "^18.2.15",
-    "typescript": "^5.3.3",
-    "vite": "^5.1.4"
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.16",
+    "typescript": "~5.6.2",
+    "vite": "^6.0.5"
   }
 }
